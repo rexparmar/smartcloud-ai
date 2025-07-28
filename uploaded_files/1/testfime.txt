@@ -1,1 +1,2 @@
-love
+This is a test file for the SmartCloud AI project.
+It contains sample content to test file upload and background processing via Celery.

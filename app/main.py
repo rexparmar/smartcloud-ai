@@ -68,7 +68,8 @@ async def upload_file(
 
     return {
         "message": f"File uploaded for user {user.email}",
-        "path": file_path
+        "path": file_path,
+        "id": metadata.id
     }
 
 

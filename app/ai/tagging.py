@@ -130,38 +130,154 @@ class AITaggingSystem:
             return ""
         
         try:
-            # Simple rule-based summarization
+            # Clean and prepare text
+            text = text.strip()
+            
+            # For very short texts, return as is
+            if len(text) < 100:
+                return text
+            
+            # Split into sentences
             sentences = re.split(r'[.!?]+', text)
-            sentences = [s.strip() for s in sentences if s.strip()]
+            sentences = [s.strip() for s in sentences if s.strip() and len(s.strip()) > 10]
             
             if len(sentences) <= 2:
-                return text[:200] + "..." if len(text) > 200 else text
+                # For short documents, create a summary
+                if len(text) > 150:
+                    # Find the most important sentence or create a summary
+                    important_terms = ['project', 'report', 'summary', 'overview', 'introduction']
+                    for sentence in sentences:
+                        if any(term in sentence.lower() for term in important_terms):
+                            return sentence + "."
+                    
+                    # If no important sentence found, take first sentence
+                    return sentences[0] + "." if sentences else text[:150] + "..."
+                else:
+                    return text
             
-            # Take first and last sentence, plus any sentence with key terms
-            key_terms = ['project', 'report', 'summary', 'conclusion', 'important', 'key']
-            important_sentences = []
+            # For longer documents, create a proper summary
+            summary_sentences = []
+            
+            # 1. Extract title/topic (usually first sentence)
+            if sentences:
+                first_sentence = sentences[0]
+                # Check if it looks like a title
+                if len(first_sentence) < 100 and any(word in first_sentence.lower() for word in ['report', 'document', 'project', 'overview', 'summary', 'analysis']):
+                    summary_sentences.append(first_sentence)
+            
+            # 2. Find sentences with key achievements/results (highest priority)
+            achievement_keywords = ['achieved', 'completed', 'implemented', 'successfully', 'result', 'outcome', 'delivered', 'finished', 'accomplished', 'developed', 'created', 'built']
+            achievement_sentences = []
             
             for sentence in sentences:
-                if any(term in sentence.lower() for term in key_terms):
-                    important_sentences.append(sentence)
+                if any(keyword in sentence.lower() for keyword in achievement_keywords):
+                    achievement_sentences.append(sentence)
             
-            summary_sentences = []
-            if sentences:
-                summary_sentences.append(sentences[0])  # First sentence
-            
-            # Add important sentences
-            for sentence in important_sentences[:2]:
+            # Add up to 2 achievement sentences
+            for sentence in achievement_sentences[:2]:
                 if sentence not in summary_sentences:
                     summary_sentences.append(sentence)
             
-            if sentences and sentences[-1] not in summary_sentences:
-                summary_sentences.append(sentences[-1])  # Last sentence
+            # 3. Find sentences with key features/capabilities
+            feature_keywords = ['feature', 'system', 'technology', 'capability', 'functionality', 'tool', 'platform', 'solution', 'service']
+            feature_sentences = []
             
-            summary = ". ".join(summary_sentences)
-            return summary[:300] + "..." if len(summary) > 300 else summary
+            for sentence in sentences:
+                if any(keyword in sentence.lower() for keyword in feature_keywords):
+                    feature_sentences.append(sentence)
             
+            # Add up to 1 feature sentence
+            for sentence in feature_sentences[:1]:
+                if sentence not in summary_sentences:
+                    summary_sentences.append(sentence)
+            
+            # 4. Find sentences with key information/objectives
+            info_keywords = ['key', 'important', 'main', 'primary', 'objective', 'goal', 'purpose', 'aim', 'target', 'focus']
+            info_sentences = []
+            
+            for sentence in sentences:
+                if any(keyword in sentence.lower() for keyword in info_keywords):
+                    info_sentences.append(sentence)
+            
+            # Add up to 1 info sentence
+            for sentence in info_sentences[:1]:
+                if sentence not in summary_sentences:
+                    summary_sentences.append(sentence)
+            
+            # 5. Find status/current state sentences
+            status_keywords = ['currently', 'status', 'progress', 'schedule', 'budget', 'ready', 'deployment', 'production']
+            status_sentences = []
+            
+            for sentence in sentences:
+                if any(keyword in sentence.lower() for keyword in status_keywords):
+                    status_sentences.append(sentence)
+            
+            # Add up to 1 status sentence
+            for sentence in status_sentences[:1]:
+                if sentence not in summary_sentences:
+                    summary_sentences.append(sentence)
+            
+            # 6. If we don't have enough sentences, add the most descriptive one
+            if len(summary_sentences) < 2:
+                # Find the longest sentence that's not too long and contains important content
+                remaining_sentences = [s for s in sentences if s not in summary_sentences]
+                if remaining_sentences:
+                    # Score sentences based on content importance
+                    scored_sentences = []
+                    for sentence in remaining_sentences:
+                        score = 0
+                        # Score based on length (prefer medium length)
+                        if 50 <= len(sentence) <= 120:
+                            score += 2
+                        # Score based on content keywords
+                        content_keywords = ['project', 'system', 'development', 'team', 'work', 'implementation']
+                        score += sum(1 for keyword in content_keywords if keyword in sentence.lower())
+                        scored_sentences.append((sentence, score))
+                    
+                    # Sort by score and take the best one
+                    if scored_sentences:
+                        best_sentence = max(scored_sentences, key=lambda x: x[1])[0]
+                        if len(best_sentence) < 150:
+                            summary_sentences.append(best_sentence)
+            
+            # 7. Create the final summary
+            if summary_sentences:
+                summary = ". ".join(summary_sentences)
+                
+                # Ensure proper ending
+                if not summary.endswith('.'):
+                    summary += "."
+                
+                # Limit length and ensure it's meaningful
+                if len(summary) > 300:
+                    # Try to keep complete sentences
+                    sentences_in_summary = summary.split('. ')
+                    if len(sentences_in_summary) > 1:
+                        # Keep as many complete sentences as possible within limit
+                        truncated_summary = ""
+                        for sentence in sentences_in_summary:
+                            if len(truncated_summary + sentence) < 297:
+                                truncated_summary += sentence + ". "
+                            else:
+                                break
+                        summary = truncated_summary.strip()
+                        if not summary.endswith('.'):
+                            summary += "..."
+                    else:
+                        summary = summary[:297] + "..."
+                
+                return summary
+            else:
+                # Fallback: create a simple summary from first few sentences
+                if len(sentences) >= 3:
+                    summary = ". ".join(sentences[:3]) + "."
+                    return summary[:300] + "..." if len(summary) > 300 else summary
+                else:
+                    return ". ".join(sentences) + "."
+                    
         except Exception as e:
             logger.error(f"Error generating summary: {e}")
+            # Fallback: return first 200 characters
             return text[:200] + "..." if len(text) > 200 else text
     
     def process_file(self, file_path: str) -> Tuple[List[str], str]:

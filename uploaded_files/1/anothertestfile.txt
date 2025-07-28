@@ -23,4 +23,4 @@ Next steps for the project:
 - Adding support for more document formats like Excel and PowerPoint
 - Implementing advanced search features with semantic understanding
 
-The project is currently on schedule and within budget. All team members are satisfied with the progress and excited about the upcoming AI features. The system is ready for production deployment. 
+The project is currently on schedule and within budget. All team members are satisfied with the progress and excited about the upcoming AI features. The system is ready for production deployment.
