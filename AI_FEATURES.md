@@ -20,6 +20,12 @@ The SmartCloud system now includes AI-powered automatic tagging and summarizatio
 - **Multi-field Search**: Search across filenames, AI tags, and summaries
 - **Real-time Results**: Instant search results with AI-enhanced metadata
 
+### 🤖 File Querying (NEW!)
+- **Interactive File Q&A**: Ask questions about specific files
+- **Natural Language Queries**: Use natural language to ask about file content
+- **Intelligent Responses**: Get contextual answers based on file content
+- **Multiple Query Types**: Ask about achievements, features, status, next steps, team info, budget, etc.
+
 ## Supported File Types
 
 - **Text Files**: .txt files
@@ -54,6 +60,36 @@ GET /files/search?query={search_term}
 ```
 Search files by AI tags, summary, or filename.
 
+### File Querying (NEW!)
+```http
+POST /files/{file_id}/query
+Content-Type: application/x-www-form-urlencoded
+
+prompt=What are the main achievements in this document?
+```
+Query a specific file with natural language questions.
+
+**Example Queries:**
+- "What is this document about?"
+- "What are the main achievements mentioned?"
+- "What features or capabilities are described?"
+- "What is the current status of the project?"
+- "What are the next steps?"
+- "What team information is available?"
+- "What budget information is mentioned?"
+- "Summarize this document for me"
+
+**Response:**
+```json
+{
+  "file_id": 1,
+  "filename": "project_report.txt",
+  "user_prompt": "What are the main achievements?",
+  "ai_answer": "Key achievements mentioned in the document: Successfully implemented secure user authentication with JWT tokens. Created robust file upload and storage system. Developed AI-powered content analysis and tagging.",
+  "status": "success"
+}
+```
+
 ## Database Schema
 
 The `file_metadata` table includes two new columns:
@@ -65,13 +101,15 @@ The `file_metadata` table includes two new columns:
 ### AI Models Used
 - **Tagging**: Facebook BART-large-mnli for zero-shot classification
 - **Summarization**: Facebook BART-large-cnn for text summarization
+- **Querying**: Rule-based approach with keyword analysis (expandable to LLM)
 
 ### Processing Pipeline
 1. **Text Extraction**: Extract text content from various file formats
 2. **Content Analysis**: Analyze text using AI models
 3. **Tag Generation**: Generate relevant tags using zero-shot classification
 4. **Summary Generation**: Create concise summaries
-5. **Database Storage**: Save results to database
+5. **Query Processing**: Handle natural language queries about file content
+6. **Database Storage**: Save results to database
 
 ### Error Handling
 - Graceful fallback for unsupported file types
@@ -108,6 +146,14 @@ curl -X GET "http://localhost:8000/files/search?query=finance" \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
+### Query a File (NEW!)
+```bash
+curl -X POST "http://localhost:8000/files/1/query" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "prompt=What are the main achievements in this document?"
+```
+
 ### Manual AI Processing
 ```bash
 curl -X POST "http://localhost:8000/files/1/process-ai" \
@@ -127,4 +173,8 @@ curl -X POST "http://localhost:8000/files/1/process-ai" \
 - Advanced content analysis (sentiment, key entities)
 - Multi-language support
 - Document structure analysis
-- Image content analysis for image files 
+- Image content analysis for image files
+- Integration with external LLM APIs (OpenAI, Anthropic, etc.)
+- Advanced query processing with semantic understanding
+- Conversation history for file queries
+- Multi-file querying across related documents 

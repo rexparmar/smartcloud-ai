@@ -241,6 +241,40 @@ async def search_files(
         for f in results
     ]
 
+@app.post("/files/{file_id}/query")
+async def query_file(
+    file_id: int,
+    prompt: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Query a specific file with AI - ask questions about the file content"""
+    file = db.query(FileMeta).filter(FileMeta.id == file_id, FileMeta.owner_id == user.id).first()
+    if not file:
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    try:
+        # Import the query system
+        from app.ai.query import query_file_with_ai
+        
+        # Query the file with AI
+        result = query_file_with_ai(file.file_path, prompt)
+        
+        if result["status"] == "success":
+            return {
+                "file_id": file_id,
+                "filename": file.file_name,
+                "user_prompt": prompt,
+                "ai_answer": result["answer"],
+                "status": "success"
+            }
+        else:
+            raise HTTPException(status_code=500, detail=f"AI query failed: {result.get('message', 'Unknown error')}")
+            
+    except Exception as e:
+        logger.error(f"Error querying file with AI: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error during AI query")
+
 # Create tables (users table etc.)
 Base.metadata.create_all(bind=engine)
 
