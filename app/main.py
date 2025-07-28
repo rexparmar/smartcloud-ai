@@ -82,11 +82,14 @@ async def list_user_files(
 
     return [
         {
+            "id": f.id,
             "filename": f.file_name,
             "size": f.file_size,
             "path": f.file_path,
             "mime_type": f.mime_type,
-            "uploaded_at": f.upload_date.isoformat()
+            "uploaded_at": f.upload_date.isoformat(),
+            "ai_tags": f.ai_tags.split(", ") if f.ai_tags else [],
+            "summary": f.summary
         }
         for f in files
     ]
@@ -142,6 +145,100 @@ def access_shared_file(token: str, db: Session = Depends(get_db)):
         media_type=file.mime_type
     )
 
+
+@app.get("/files/{file_id}")
+async def get_file_details(
+    file_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get detailed information about a specific file including AI results"""
+    file = db.query(FileMeta).filter(FileMeta.id == file_id, FileMeta.owner_id == user.id).first()
+    if not file:
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    return {
+        "id": file.id,
+        "filename": file.file_name,
+        "size": file.file_size,
+        "path": file.file_path,
+        "mime_type": file.mime_type,
+        "uploaded_at": file.upload_date.isoformat(),
+        "ai_tags": file.ai_tags.split(", ") if file.ai_tags else [],
+        "summary": file.summary
+    }
+
+@app.post("/files/{file_id}/process-ai")
+async def process_file_with_ai_endpoint(
+    file_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Manually trigger AI processing for a specific file"""
+    file = db.query(FileMeta).filter(FileMeta.id == file_id, FileMeta.owner_id == user.id).first()
+    if not file:
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    # Import here to avoid circular imports
+    from app.tasks.file_tasks import update_file_metadata_with_ai
+    
+    try:
+        result = update_file_metadata_with_ai(file_id, file.file_path)
+        
+        if result["status"] == "success":
+            return {
+                "message": "AI processing completed successfully",
+                "tags": result["tags"],
+                "summary": result["summary"]
+            }
+        else:
+            raise HTTPException(status_code=500, detail=f"AI processing failed: {result.get('message', 'Unknown error')}")
+            
+    except Exception as e:
+        logger.error(f"Error processing file with AI: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error during AI processing")
+
+@app.get("/files/search")
+async def search_files(
+    query: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Search files by AI tags, summary, or filename"""
+    files = db.query(FileMeta).filter(FileMeta.owner_id == user.id).all()
+    
+    results = []
+    query_lower = query.lower()
+    
+    for file in files:
+        # Search in filename
+        if query_lower in file.file_name.lower():
+            results.append(file)
+            continue
+            
+        # Search in AI tags
+        if file.ai_tags and query_lower in file.ai_tags.lower():
+            results.append(file)
+            continue
+            
+        # Search in summary
+        if file.summary and query_lower in file.summary.lower():
+            results.append(file)
+            continue
+    
+    return [
+        {
+            "id": f.id,
+            "filename": f.file_name,
+            "size": f.file_size,
+            "path": f.file_path,
+            "mime_type": f.mime_type,
+            "uploaded_at": f.upload_date.isoformat(),
+            "ai_tags": f.ai_tags.split(", ") if f.ai_tags else [],
+            "summary": f.summary
+        }
+        for f in results
+    ]
 
 # Create tables (users table etc.)
 Base.metadata.create_all(bind=engine)
