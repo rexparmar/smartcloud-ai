@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Depends
+from fastapi import FastAPI, UploadFile, File, Depends, HTTPException
 import os
 from app.database import Base, engine
 from app.auth import auth_routes
@@ -11,12 +11,19 @@ from app.database import SessionLocal
 from app.model.share import SharedLink
 from datetime import datetime, timedelta
 import uuid
-from app.tasks.file_tasks import process_file_task
+from app.tasks.file_tasks import process_file_task, process_file_sync
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # Ensure upload folder exists
 UPLOAD_DIR = "uploaded_files"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 app = FastAPI()
+
 def get_db():
     db = SessionLocal()
     try:
@@ -48,7 +55,16 @@ async def upload_file(
     db.add(metadata)
     db.commit()
     
-    process_file_task.delay(file_path)
+    # Handle Celery task with error handling
+    try:
+        process_file_task.delay(file_path)
+        logger.info(f"File processing task queued for {file_path}")
+    except Exception as e:
+        logger.error(f"Failed to queue file processing task: {e}")
+        # Fallback to synchronous processing
+        logger.info("Falling back to synchronous processing")
+        result = process_file_sync(file_path)
+        logger.info(f"Synchronous processing result: {result}")
 
     return {
         "message": f"File uploaded for user {user.email}",
