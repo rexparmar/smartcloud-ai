@@ -1,5 +1,6 @@
 from celery import shared_task
-from app.ai.tagging import process_file_with_ai
+from app.ai.enhanced_processor import get_enhanced_processor
+from app.ai.tagging import get_ai_tagger
 from app.database import SessionLocal
 from app.model.file import FileMeta
 from sqlalchemy.orm import Session
@@ -28,15 +29,28 @@ def process_file_sync(file_path: str):
     try:
         print(f"🚀 Processing file with AI at {file_path}")
         
-        # Process file with AI
-        result = process_file_with_ai(file_path)
+        # Get enhanced AI processor
+        enhanced_processor = get_enhanced_processor()
+        ai_tagger = get_ai_tagger()
+        
+        # Extract text from file
+        text = ai_tagger.extract_text_from_file(file_path)
+        
+        if not text.strip():
+            logger.warning(f"No text content found in file: {file_path}")
+            return {"status": "error", "message": "No text content found in file"}
+        
+        # Process file with enhanced AI
+        result = enhanced_processor.process_file_complete(text)
         
         if result["status"] == "success":
             tags = result["tags"]
             summary = result["summary"]
+            analysis = result.get("analysis", {})
             
             print(f"🏷️ AI Tags: {', '.join(tags)}")
             print(f"📝 AI Summary: {summary[:100]}...")
+            print(f"📊 Analysis: {analysis}")
             
             # Save to database
             db = get_db()
@@ -57,6 +71,7 @@ def process_file_sync(file_path: str):
                     "status": "success", 
                     "tags": tags, 
                     "summary": summary,
+                    "analysis": analysis,
                     "file_id": file_metadata.id
                 }
             else:
@@ -65,7 +80,8 @@ def process_file_sync(file_path: str):
                     "status": "warning", 
                     "message": "File metadata not found in database",
                     "tags": tags, 
-                    "summary": summary
+                    "summary": summary,
+                    "analysis": analysis
                 }
         else:
             logger.error(f"AI processing failed for {file_path}")
@@ -86,12 +102,24 @@ def update_file_metadata_with_ai(file_id: int, file_path: str):
     try:
         print(f"🔄 Updating file metadata with AI for file ID: {file_id}")
         
-        # Process file with AI
-        result = process_file_with_ai(file_path)
+        # Get enhanced AI processor
+        enhanced_processor = get_enhanced_processor()
+        ai_tagger = get_ai_tagger()
+        
+        # Extract text from file
+        text = ai_tagger.extract_text_from_file(file_path)
+        
+        if not text.strip():
+            logger.warning(f"No text content found in file: {file_path}")
+            return {"status": "error", "message": "No text content found in file"}
+        
+        # Process file with enhanced AI
+        result = enhanced_processor.process_file_complete(text)
         
         if result["status"] == "success":
             tags = result["tags"]
             summary = result["summary"]
+            analysis = result.get("analysis", {})
             
             # Update database
             db = get_db()
@@ -106,7 +134,8 @@ def update_file_metadata_with_ai(file_id: int, file_path: str):
                 return {
                     "status": "success",
                     "tags": tags,
-                    "summary": summary
+                    "summary": summary,
+                    "analysis": analysis
                 }
             else:
                 logger.error(f"File metadata not found: {file_id}")

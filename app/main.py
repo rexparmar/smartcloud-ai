@@ -1,4 +1,5 @@
 from fastapi import FastAPI, UploadFile, File, Depends, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 import os
 from app.database import Base, engine
 from app.auth import auth_routes
@@ -23,6 +24,21 @@ UPLOAD_DIR = "uploaded_files"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 app = FastAPI()
+
+# Configure CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",  # Local development
+        "http://localhost:3001",  # Alternative local port
+        "https://*.vercel.app",   # Vercel deployments
+        "https://*.vercel.com",   # Vercel domains
+        "https://v0-frontend-for-api-endpoints-rosy.vercel.app",  # Replace with your actual domain
+    ],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+)
 
 def get_db():
     db = SessionLocal()
@@ -240,6 +256,60 @@ async def search_files(
         }
         for f in results
     ]
+
+@app.delete("/files/{file_id}")
+async def delete_file(
+    file_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Delete a file and its metadata"""
+    try:
+        # Find the file in database
+        file_metadata = db.query(FileMeta).filter(
+            FileMeta.id == file_id, 
+            FileMeta.owner_id == user.id
+        ).first()
+        
+        if not file_metadata:
+            raise HTTPException(status_code=404, detail="File not found")
+        
+        # Get file path for physical deletion
+        file_path = file_metadata.file_path
+        
+        # First, delete any shared links for this file (to avoid foreign key constraint)
+        shared_links = db.query(SharedLink).filter(SharedLink.file_id == file_id).all()
+        for link in shared_links:
+            db.delete(link)
+        db.commit()
+        
+        # Now delete the file metadata
+        db.delete(file_metadata)
+        db.commit()
+        
+        # Delete physical file if it exists
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+                logger.info(f"Physical file deleted: {file_path}")
+            except Exception as e:
+                logger.warning(f"Failed to delete physical file {file_path}: {e}")
+                # Don't fail the request if physical deletion fails
+        
+        logger.info(f"File {file_id} deleted for user {user.email}")
+        
+        return {
+            "message": "File deleted successfully",
+            "file_id": file_id,
+            "filename": file_metadata.file_name
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting file {file_id}: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @app.post("/files/{file_id}/query")
 async def query_file(

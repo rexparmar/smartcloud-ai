@@ -1,6 +1,7 @@
 # app/ai/query.py
 import logging
 from typing import Dict, Optional
+from app.ai.enhanced_processor import get_enhanced_processor
 from app.ai.tagging import get_ai_tagger
 
 logger = logging.getLogger(__name__)
@@ -8,11 +9,12 @@ logger = logging.getLogger(__name__)
 class FileQuerySystem:
     def __init__(self):
         """Initialize file query system"""
-        self.ai_tagger = get_ai_tagger()
-        logger.info("File query system initialized")
+        self.enhanced_processor = get_enhanced_processor()
+        self.ai_tagger = get_ai_tagger()  # For text extraction
+        logger.info("File query system initialized with enhanced AI processor")
     
     def query_file(self, file_path: str, user_prompt: str) -> Dict[str, any]:
-        """Query a specific file with a user prompt"""
+        """Query a specific file with a user prompt using enhanced AI"""
         try:
             # Extract text from file
             text = self.ai_tagger.extract_text_from_file(file_path)
@@ -24,19 +26,14 @@ class FileQuerySystem:
                     "answer": "I cannot answer questions about this file as it contains no readable text content."
                 }
             
-            # Create a context-aware prompt for the LLM
-            enhanced_prompt = self._create_enhanced_prompt(text, user_prompt)
+            # Use enhanced AI processor for querying
+            result = self.enhanced_processor.query_file_content(text, user_prompt)
             
-            # Generate answer using rule-based approach (for now)
-            # In the future, this can be replaced with actual LLM calls
-            answer = self._generate_answer(enhanced_prompt, text)
+            # Add file path to result
+            result["file_path"] = file_path
+            result["user_prompt"] = user_prompt
             
-            return {
-                "status": "success",
-                "file_path": file_path,
-                "user_prompt": user_prompt,
-                "answer": answer
-            }
+            return result
             
         except Exception as e:
             logger.error(f"Error querying file {file_path}: {e}")
