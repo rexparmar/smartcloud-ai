@@ -34,6 +34,7 @@ app.add_middleware(
         "https://*.vercel.app", 
         "https://*.vercel.com",   
         "https://v0-frontend-for-api-endpoints-rosy.vercel.app",
+        "*",
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
