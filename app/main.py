@@ -29,11 +29,11 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000",  # Local development
-        "http://localhost:3001",  # Alternative local port
-        "https://*.vercel.app",   # Vercel deployments
-        "https://*.vercel.com",   # Vercel domains
-        "https://v0-frontend-for-api-endpoints-rosy.vercel.app",  # Replace with your actual domain
+        "http://localhost:3000",  
+        "http://localhost:3001",  
+        "https://*.vercel.app", 
+        "https://*.vercel.com",   
+        "https://v0-frontend-for-api-endpoints-rosy.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],

@@ -29,6 +29,10 @@ export HUGGINGFACE_API_KEY="your_hf_key"
 
 ### 3. Run the Application
 ```bash
+# Option 1: Using the startup script (recommended)
+python run.py
+
+# Option 2: Using uvicorn directly
 uvicorn app.main:app --reload
 ```
 
@@ -67,4 +71,4 @@ curl -X POST "http://localhost:8000/upload" \
 ## Documentation
 
 - API docs: `http://localhost:8000/docs`
-- AI setup guide: See `AI_SETUP.md`
+- AI features: See `AI_FEATURES.md`
